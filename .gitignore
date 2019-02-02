@@ -1,0 +1,6 @@
+/venv/*
+/datasets/*
+/origindata/*
+/processeddata/*
+/saved_model/*
+/.idea/*
