@@ -13,7 +13,7 @@ from tensorflow.python.keras import regularizers, initializers
 from tensorflow.python.keras.callbacks import ModelCheckpoint
 from tensorflow.python.keras.models import Model
 from tensorflow.python.keras.utils import multi_gpu_model
-from tensorflow.python.keras.optimizers import RMSprop
+import argparse
 import tensorflow as tf
 import os
 
@@ -26,6 +26,7 @@ def parse_tfrecord(example):
     image = tf.decode_raw(img_features['Raw_Image'], tf.uint8)
     image = tf.reshape(image, [299, 299, 3])
     image = tf.cast(image, dtype=tf.float32)
+    image = tf.divide(image, 255)
     label = tf.cast(img_features['Label'], tf.int32)
     label = tf.one_hot(label, depth=7)
     return image, label
@@ -33,9 +34,8 @@ def parse_tfrecord(example):
 
 def tfdata_generator(filename, batch_size):
     dataset = tf.data.TFRecordDataset(filenames=[filename])
-    dataset = dataset.map(parse_tfrecord)
-    dataset = dataset.shuffle(7316)
-    dataset = dataset.repeat()
+    dataset = dataset.map(parse_tfrecord,num_parallel_calls=12)
+    dataset = dataset.apply(tf.contrib.data.shuffle_and_repeat(7316))
     dataset = dataset.prefetch(tf.contrib.data.AUTOTUNE)
     dataset = dataset.batch(batch_size)
     return dataset
@@ -52,49 +52,49 @@ def conv2d_bn(x, n_filter, n_row, n_col, padding='same', stride=(1, 1), use_bias
     return x
 
 
-def inception_block_a(input):
-    branch_1 = conv2d_bn(input, 64, 1, 1)
+def inception_block_a(inputs):
+    branch_1 = conv2d_bn(inputs, 64, 1, 1)
     branch_1 = conv2d_bn(branch_1, 96, 3, 3)
     branch_1 = conv2d_bn(branch_1, 96, 3, 3)
 
-    branch_2 = conv2d_bn(input, 64, 1, 1)
+    branch_2 = conv2d_bn(inputs, 64, 1, 1)
     branch_2 = conv2d_bn(branch_2, 96, 3, 3)
 
-    branch_3 = conv2d_bn(input, 96, 1, 1)
-    branch_4 = AveragePooling2D((3, 3), strides=(1, 1), padding='same')(input)
+    branch_3 = conv2d_bn(inputs, 96, 1, 1)
+    branch_4 = AveragePooling2D((3, 3), strides=(1, 1), padding='same')(inputs)
     branch_4 = conv2d_bn(branch_4, 96, 1, 1)
 
     x = concatenate([branch_1, branch_2, branch_3, branch_4])
     return x
 
 
-def reduction_block_a(input):
-    branch_1 = conv2d_bn(input, 192, 1, 1)
+def reduction_block_a(inputs):
+    branch_1 = conv2d_bn(inputs, 192, 1, 1)
     branch_1 = conv2d_bn(branch_1, 224, 3, 3)
     branch_1 = conv2d_bn(branch_1, 256, 3, 3, stride=(2, 2), padding='valid')
 
-    branch_2 = conv2d_bn(input, 384, 3, 3, stride=(2, 2), padding='valid')
+    branch_2 = conv2d_bn(inputs, 384, 3, 3, stride=(2, 2), padding='valid')
 
-    branch_3 = MaxPooling2D((3, 3), strides=(2, 2), padding='valid')(input)
+    branch_3 = MaxPooling2D((3, 3), strides=(2, 2), padding='valid')(inputs)
 
     x = concatenate([branch_1, branch_2, branch_3])
     return x
 
 
-def inception_block_b(input):
-    branch_1 = conv2d_bn(input, 192, 1, 1)
+def inception_block_b(inputs):
+    branch_1 = conv2d_bn(inputs, 192, 1, 1)
     branch_1 = conv2d_bn(branch_1, 192, 1, 7)
     branch_1 = conv2d_bn(branch_1, 224, 7, 1)
     branch_1 = conv2d_bn(branch_1, 224, 1, 7)
     branch_1 = conv2d_bn(branch_1, 256, 7, 1)
 
-    branch_2 = conv2d_bn(input, 192, 1, 1)
+    branch_2 = conv2d_bn(inputs, 192, 1, 1)
     branch_2 = conv2d_bn(branch_2, 224, 1, 7)
     branch_2 = conv2d_bn(branch_2, 256, 1, 7)
 
-    branch_3 = conv2d_bn(input, 384, 1, 1)
+    branch_3 = conv2d_bn(inputs, 384, 1, 1)
 
-    branch_4 = AveragePooling2D((2, 2), strides=(1, 1), padding='same')(input)
+    branch_4 = AveragePooling2D((2, 2), strides=(1, 1), padding='same')(inputs)
 
     branch_4 = conv2d_bn(branch_4, 128, 1, 1)
 
@@ -102,43 +102,43 @@ def inception_block_b(input):
     return x
 
 
-def reduction_block_b(input):
-    branch_1 = conv2d_bn(input, 256, 1, 1)
+def reduction_block_b(inputs):
+    branch_1 = conv2d_bn(inputs, 256, 1, 1)
     branch_1 = conv2d_bn(branch_1, 256, 1, 7)
     branch_1 = conv2d_bn(branch_1, 320, 7, 1)
     branch_1 = conv2d_bn(branch_1, 320, 3, 3, stride=(2, 2), padding='valid')
 
-    branch_2 = conv2d_bn(input, 192, 1, 1)
+    branch_2 = conv2d_bn(inputs, 192, 1, 1)
     branch_2 = conv2d_bn(branch_2, 192, 3, 3, stride=(2, 2), padding='valid')
 
-    branch_3 = MaxPooling2D((3, 3), strides=(2, 2), padding='valid')(input)
+    branch_3 = MaxPooling2D((3, 3), strides=(2, 2), padding='valid')(inputs)
 
     x = concatenate([branch_1, branch_2, branch_3])
     return x
 
 
-def inception_block_c(input):
-    branch_1 = conv2d_bn(input, 384, 1, 1)
+def inception_block_c(inputs):
+    branch_1 = conv2d_bn(inputs, 384, 1, 1)
     branch_1 = conv2d_bn(branch_1, 448, 1, 3)
     branch_1 = conv2d_bn(branch_1, 512, 3, 1)
     branch_1_1 = conv2d_bn(branch_1, 256, 1, 3)
     branch_1_2 = conv2d_bn(branch_1, 256, 3, 1)
 
-    branch_2 = conv2d_bn(input, 384, 1, 1)
+    branch_2 = conv2d_bn(inputs, 384, 1, 1)
     branch_2_1 = conv2d_bn(branch_2, 256, 3, 1)
     branch_2_2 = conv2d_bn(branch_2, 256, 1, 3)
 
-    branch_3 = conv2d_bn(input, 256, 1, 1)
+    branch_3 = conv2d_bn(inputs, 256, 1, 1)
 
-    branch_4 = AveragePooling2D((2, 2), strides=(1, 1), padding='same')(input)
+    branch_4 = AveragePooling2D((2, 2), strides=(1, 1), padding='same')(inputs)
     branch_4 = conv2d_bn(branch_4, 256, 1, 1)
 
     x = concatenate([branch_1_1, branch_1_2, branch_2_1, branch_2_2, branch_3, branch_4])
     return x
 
 
-def inception_stem(input):
-    net = conv2d_bn(input, 32, 3, 3, stride=(2, 2), padding='valid')
+def inception_stem(inputs):
+    net = conv2d_bn(inputs, 32, 3, 3, stride=(2, 2), padding='valid')
     net = conv2d_bn(net, 32, 3, 3, padding='valid')
     net = conv2d_bn(net, 64, 3, 3)
 
@@ -165,59 +165,45 @@ def inception_stem(input):
     return net
 
 
-def keras_model(num_classes=7, keep_prob=0.5, include_top=True):
+def keras_model():
     inputs = Input(shape=(299, 299, 3))
-    x = inception_stem(inputs)
+    net = inception_stem(inputs)
     for i in range(4):
-        x = inception_block_a(x)
-    x = reduction_block_a(x)
+        net = inception_block_a(net)
+    net = reduction_block_a(net)
     for i in range(7):
-        x = inception_block_b(x)
-    x = reduction_block_b(x)
+        net = inception_block_b(net)
+    net = reduction_block_b(net)
     for i in range(3):
-        x = inception_block_c(x)
-    if include_top:
-        x = AveragePooling2D(8, 8, padding='valid')(x)
-        x = Dropout(keep_prob)(x)
-        x = Flatten()(x)
-        x = Dense(units=num_classes, activation='softmax')(x)
+        net = inception_block_c(net)
+    net = AveragePooling2D(8, 8, padding='valid')(net)
+    net = Dropout(0.5)(net)
+    net = Flatten()(net)
+    outputs = Dense(units=7, activation='softmax')(net)
 
-    model = Model(inputs, x, name='inception_v4')
-
+    model = Model(inputs, outputs, name='inception_v4')
     return model
 
 
 def train(ckpt=None, batch_size=32):
-    tf.enable_eager_execution()
     if os.path.exists(os.path.join('.', 'datasets')):
         tfrecord = os.path.join('.', 'datasets', 'snake299.training.tfrecord')
         training_set = tfdata_generator(filename=tfrecord, batch_size=batch_size)
     else:
         tfrecord = os.path.join('..', 'datasets', 'snake299.training.tfrecord')
         training_set = tfdata_generator(filename=tfrecord, batch_size=batch_size)
-    image,label = training_set.make_one_shot_iterator()
+
     model = keras_model()
     if ckpt != None:
         print('loading weights')
         model.load_weights(ckpt)
     try:
-        parallel_model = multi_gpu_model(model, gpus=2, cpu_merge=False)
+        parallel_model = multi_gpu_model(model, gpus=2)
         print('Training using multiple GPUs')
     except:
         parallel_model = model
         print('Training using single GPU')
-    optimizer = RMSprop(lr=0.045, rho=0.9, epsilon=1, decay=0.94)
-
-    aug = ImageDataGenerator(featurewise_center=True,
-                             featurewise_std_normalization=True,
-                             rotation_range=180,
-                             width_shift_range=0.2,
-                             height_shift_range=0.2,
-                             brightness_range=(0.2, 0.8),
-                             shear_range=0.2,
-                             zoom_range=0.5,
-                             channel_shift_range=0.5,
-                             horizontal_flip=True)
+    optimizer = tf.train.RMSPropOptimizer(learning_rate=0.045, decay=0.94, epsilon=1, momentum=0.9)
 
     parallel_model.compile(optimizer=optimizer, loss='categorical_crossentropy'
                            , metrics=['accuracy'])
@@ -228,9 +214,19 @@ def train(ckpt=None, batch_size=32):
     ckpt = ModelCheckpoint(filepath=save_path, monitor='loss', save_best_only=True,
                            save_weights_only=True, mode='min', period=10)
     callbacks_list = [ckpt]
-    parallel_model.fit_generator(aug.flow(x=image, y=label,batch_size=12), steps_per_epoch=229, epochs=30000,
-                                     callbacks=callbacks_list)
+
+    parallel_model.fit(x=training_set.make_one_shot_iterator(), epochs=30000, steps_per_epoch=115,
+                       callbacks=callbacks_list)
 
 
 if __name__ == '__main__':
-    train(batch_size=8)
+    import sys
+    try:
+        if os.path.exists(os.path.join('.', 'saved_model')):
+            save_path = os.path.join('.', 'saved_model')
+        else:
+            save_path = os.path.join('..', 'saved_model')
+        ckpt = os.path.join(save_path, sys.argv[1])
+        train(batch_size=32, ckpt=ckpt)
+    except:
+        train(batch_size=32)

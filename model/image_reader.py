@@ -1,6 +1,7 @@
 import tensorflow as tf
-
+from tensorflow.python.keras.preprocessing.image import ImageDataGenerator
 import os
+
 
 def parse_tfrecord(example):
     img_features = tf.parse_single_example(
@@ -18,8 +19,7 @@ def parse_tfrecord(example):
 def tfdata_generator(filename, batch_size):
     dataset = tf.data.TFRecordDataset(filenames=[filename])
     dataset = dataset.map(parse_tfrecord)
-    dataset = dataset.shuffle(7316)
-    dataset = dataset.repeat()
+    dataset = dataset.apply(tf.contrib.data.shuffle_and_repeat(7316))
     dataset = dataset.prefetch(tf.contrib.data.AUTOTUNE)
     dataset = dataset.batch(batch_size)
     return dataset
@@ -33,4 +33,16 @@ if __name__ == '__main__':
     else:
         tfrecord = os.path.join('..', 'datasets', 'snake299.training.tfrecord')
         training_set = tfdata_generator(filename=tfrecord, batch_size=32)
-    image,label = training_set.make_one_shot_iterator()
+    aug = ImageDataGenerator(featurewise_center=True,
+                             featurewise_std_normalization=True,
+                             rotation_range=180,
+                             width_shift_range=0.2,
+                             height_shift_range=0.2,
+                             brightness_range=(0.2, 0.8),
+                             shear_range=0.2,
+                             zoom_range=0.5,
+                             channel_shift_range=0.5,
+                             horizontal_flip=True)
+    iterator = training_set.make_one_shot_iterator()
+    print(iterator.get_next()[1])
+

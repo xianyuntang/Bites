@@ -1,4 +1,5 @@
 import tensorflow as tf
+from tensorflow.python.keras.layers import Conv2D
 import os
 import time
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"
@@ -28,7 +29,7 @@ def tfdata_generator(filename, batch_size):
 
 
 def conv2d_bn(inputs, filters, kernel_size, strides, padding):
-    x = tf.layers.conv2d(inputs, filters=filters, kernel_size=kernel_size, strides=strides, padding=padding,
+    x = Conv2D(inputs, filters=filters, kernel_size=kernel_size, strides=strides, padding=padding,
                          kernel_regularizer=tf.contrib.layers.l2_regularizer(0.0004),
                          kernel_initializer=tf.contrib.layers.variance_scaling_initializer(factor=2.0,
                                                                                            mode='FAN_IN',
@@ -179,8 +180,6 @@ def build_model(x_train, y_label):
     net = tf.layers.flatten(net)
     output = tf.layers.dense(net, 7, activation='softmax')
     output += 1e-10
-    cross_entropy = tf.reduce_mean(-y_label * tf.log(output))
-    train_step = tf.train.RMSPropOptimizer(learning_rate=0.045, decay=0.94, epsilon=1.0).minimize(cross_entropy)
 
     correct_prediction = tf.equal(tf.argmax(output, 1), tf.argmax(y_label, 1))
     accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
@@ -188,7 +187,7 @@ def build_model(x_train, y_label):
 
 
 def train():
-    file = './datasets/snake299.training.tfrecord'
+    file = '../datasets/snake299.training.tfrecord'
     dataset = tfdata_generator(filename=file, batch_size=32)
     iterator = dataset.make_one_shot_iterator()
     image, label = iterator.get_next()
