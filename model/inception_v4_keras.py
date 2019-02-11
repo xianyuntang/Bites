@@ -1,4 +1,3 @@
-from keras.preprocessing.image import ImageDataGenerator
 from tensorflow.python.keras.layers import Convolution2D, \
     BatchNormalization, \
     Activation, \
@@ -13,10 +12,9 @@ from tensorflow.python.keras import regularizers, initializers
 from tensorflow.python.keras.callbacks import ModelCheckpoint
 from tensorflow.python.keras.models import Model
 from tensorflow.python.keras.utils import multi_gpu_model
-import argparse
 import tensorflow as tf
 import os
-
+import platform
 
 def parse_tfrecord(example):
     img_features = tf.parse_single_example(
@@ -34,7 +32,7 @@ def parse_tfrecord(example):
 
 def tfdata_generator(filename, batch_size):
     dataset = tf.data.TFRecordDataset(filenames=[filename])
-    dataset = dataset.map(parse_tfrecord,num_parallel_calls=12)
+    dataset = dataset.map(parse_tfrecord, num_parallel_calls=12)
     dataset = dataset.apply(tf.contrib.data.shuffle_and_repeat(7316))
     dataset = dataset.prefetch(tf.contrib.data.AUTOTUNE)
     dataset = dataset.batch(batch_size)
@@ -186,15 +184,29 @@ def keras_model():
 
 
 def train(ckpt=None, batch_size=32):
-    if os.path.exists(os.path.join('.', 'datasets')):
-        tfrecord = os.path.join('.', 'datasets', 'snake299.training.tfrecord')
+
+    if platform.system() == 'Windows':
+        print('Running on Windows')
+        base_dir = os.path.join('D\\', 'Program', 'Bite')
+        save_path = os.path.join(base_dir, 'saved_model',
+                                 'weights-improvement-{epoch:02d}-{loss:.4f}-{acc:.2f}.hdf5')
+        tfrecord = os.path.join(base_dir, 'datasets', 'snake299.training.tfrecord')
+        training_set = tfdata_generator(filename=tfrecord, batch_size=batch_size)
+    elif platform.system() == 'Linux':
+        print('Running on Linux')
+        base_dir = os.path.join('/media', 'md0', 'xt1800i', 'Bite')
+        save_path = os.path.join(base_dir, 'ckpt',
+                                 'weights-improvement-{epoch:02d}-{loss:.4f}-{acc:.2f}.hdf5')
+        tfrecord = os.path.join(base_dir, 'datasets', 'snake299.training.tfrecord')
         training_set = tfdata_generator(filename=tfrecord, batch_size=batch_size)
     else:
-        tfrecord = os.path.join('..', 'datasets', 'snake299.training.tfrecord')
-        training_set = tfdata_generator(filename=tfrecord, batch_size=batch_size)
+        print('Running on unsupported system')
+        return
 
-    model = keras_model()
-    if ckpt != None:
+    with tf.device('/cpu:0'):
+        model = keras_model()
+
+    if ckpt is not None:
         print('loading weights')
         model.load_weights(ckpt)
     try:
@@ -207,12 +219,9 @@ def train(ckpt=None, batch_size=32):
 
     parallel_model.compile(optimizer=optimizer, loss='categorical_crossentropy'
                            , metrics=['accuracy'])
-    if os.path.exists(os.path.join('.', 'saved_model')):
-        save_path = os.path.join('.', 'saved_model', 'weights-improvement-{epoch:02d}-{loss:.4f}.hdf5')
-    else:
-        save_path = os.path.join('..', 'saved_model', 'weights-improvement-{epoch:02d}-{loss:.4f}.hdf5')
-    ckpt = ModelCheckpoint(filepath=save_path, monitor='loss', save_best_only=True,
-                           save_weights_only=True, mode='min', period=10)
+
+    ckpt = ModelCheckpoint(filepath=save_path, monitor='acc', save_best_only=True,
+                           save_weights_only=True, mode='auto', period=1)
     callbacks_list = [ckpt]
 
     parallel_model.fit(x=training_set.make_one_shot_iterator(), epochs=30000, steps_per_epoch=115,
@@ -221,11 +230,18 @@ def train(ckpt=None, batch_size=32):
 
 if __name__ == '__main__':
     import sys
+
     try:
-        if os.path.exists(os.path.join('.', 'saved_model')):
-            save_path = os.path.join('.', 'saved_model')
+        if platform.system() == 'Windows':
+            print('Running on Windows')
+            base_dir = os.path.join('D\\', 'Program', 'Bite')
+            save_path = os.path.join(base_dir, 'saved_model')
+        elif platform.system() == 'Linux':
+            print('Running on Linux')
+            base_dir = os.path.join('/media', 'md0', 'xt1800i', 'Bite')
+            save_path = os.path.join(base_dir, 'ckpt')
         else:
-            save_path = os.path.join('..', 'saved_model')
+            pass
         ckpt = os.path.join(save_path, sys.argv[1])
         train(batch_size=32, ckpt=ckpt)
     except:

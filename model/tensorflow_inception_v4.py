@@ -1,7 +1,6 @@
 import tensorflow as tf
 import os
 import sys
-import time
 
 
 def parse_tfrecord(example):
@@ -29,38 +28,44 @@ def tfdata_generator(filename, batch_size):
 
 
 def conv2d_bn(inputs, filters, strides, padding):
-    x = tf.keras.layers.Conv2D(inputs, filters, strides=strides, padding=padding)
-    x = tf.keras.layers.BatchNormalization(momentum=0.9997, scale=False)(x)
+    x = tf.nn.conv2d(inputs, filters, strides=strides, padding=padding)
+    # print(x.shape)
+    #     # mean, var = tf.nn.moments(x, axes=[0, 1, 2])
+    #     # scale = tf.Variable(tf.ones(filters.shape[3]))
+    #     # shift = tf.Variable(tf.zeros(filters.shape[3]))
+    #     # epsilon = 0.001
+    #     # x = tf.nn.batch_normalization(x, mean, var, shift, scale, epsilon)
+    x = tf.layers.batch_normalization(x)
     return x
 
 
 def inception_stem(inputs):
     weights = {
-        'stem_w1': tf.Variable(tf.truncated_normal([3, 3, 3, 32], stddev=0.1)),
-        'stem_w2': tf.Variable(tf.truncated_normal([3, 3, 32, 32])),
-        'stem_w3': tf.Variable(tf.truncated_normal([3, 3, 32, 64])),
-        'stem_w4': tf.Variable(tf.truncated_normal([3, 3, 64, 96])),
-        'block1_branch1_w1': tf.Variable(tf.truncated_normal([1, 1, 160, 64])),
-        'block1_branch1_w2': tf.Variable(tf.truncated_normal([7, 1, 64, 64])),
-        'block1_branch1_w3': tf.Variable(tf.truncated_normal([1, 7, 64, 64])),
-        'block1_branch1_w4': tf.Variable(tf.truncated_normal([3, 3, 64, 96])),
-        'block1_branch2_w1': tf.Variable(tf.truncated_normal([1, 1, 160, 64])),
-        'block1_branch2_w2': tf.Variable(tf.truncated_normal([3, 3, 64, 96])),
-        'block2_branch1_w1': tf.Variable(tf.truncated_normal([3, 3, 192, 192]))
+        'stem_w1': tf.Variable(tf.truncated_normal([3, 3, 3, 32], stddev=0.01)),
+        'stem_w2': tf.Variable(tf.truncated_normal([3, 3, 32, 32], stddev=0.01)),
+        'stem_w3': tf.Variable(tf.truncated_normal([3, 3, 32, 64], stddev=0.01)),
+        'stem_w4': tf.Variable(tf.truncated_normal([3, 3, 64, 96], stddev=0.01)),
+        'block1_branch1_w1': tf.Variable(tf.truncated_normal([1, 1, 160, 64], stddev=0.01)),
+        'block1_branch1_w2': tf.Variable(tf.truncated_normal([7, 1, 64, 64], stddev=0.01)),
+        'block1_branch1_w3': tf.Variable(tf.truncated_normal([1, 7, 64, 64], stddev=0.01)),
+        'block1_branch1_w4': tf.Variable(tf.truncated_normal([3, 3, 64, 96], stddev=0.01)),
+        'block1_branch2_w1': tf.Variable(tf.truncated_normal([1, 1, 160, 64], stddev=0.01)),
+        'block1_branch2_w2': tf.Variable(tf.truncated_normal([3, 3, 64, 96], stddev=0.01)),
+        'block2_branch1_w1': tf.Variable(tf.truncated_normal([3, 3, 192, 192], stddev=0.01))
 
     }
     biases = {
-        'stem_b1': tf.Variable(tf.truncated_normal(shape=[32], stddev=0.1)),
-        'stem_b2': tf.Variable(tf.truncated_normal(shape=[32], stddev=0.1)),
-        'stem_b3': tf.Variable(tf.truncated_normal(shape=[64], stddev=0.1)),
-        'stem_b4': tf.Variable(tf.truncated_normal(shape=[96], stddev=0.1)),
-        'block1_branch1_b1': tf.Variable(tf.truncated_normal(shape=[64], stddev=0.1)),
-        'block1_branch1_b2': tf.Variable(tf.truncated_normal(shape=[64], stddev=0.1)),
-        'block1_branch1_b3': tf.Variable(tf.truncated_normal(shape=[64], stddev=0.1)),
-        'block1_branch1_b4': tf.Variable(tf.truncated_normal(shape=[96], stddev=0.1)),
-        'block1_branch2_b1': tf.Variable(tf.truncated_normal(shape=[64], stddev=0.1)),
-        'block1_branch2_b2': tf.Variable(tf.truncated_normal(shape=[96], stddev=0.1)),
-        'block2_branch1_b1': tf.Variable(tf.truncated_normal(shape=[192], stddev=0.1))
+        'stem_b1': tf.Variable(tf.truncated_normal(shape=[32], stddev=0.01)),
+        'stem_b2': tf.Variable(tf.truncated_normal(shape=[32], stddev=0.01)),
+        'stem_b3': tf.Variable(tf.truncated_normal(shape=[64], stddev=0.01)),
+        'stem_b4': tf.Variable(tf.truncated_normal(shape=[96], stddev=0.01)),
+        'block1_branch1_b1': tf.Variable(tf.truncated_normal(shape=[64], stddev=0.01)),
+        'block1_branch1_b2': tf.Variable(tf.truncated_normal(shape=[64], stddev=0.01)),
+        'block1_branch1_b3': tf.Variable(tf.truncated_normal(shape=[64], stddev=0.01)),
+        'block1_branch1_b4': tf.Variable(tf.truncated_normal(shape=[96], stddev=0.01)),
+        'block1_branch2_b1': tf.Variable(tf.truncated_normal(shape=[64], stddev=0.01)),
+        'block1_branch2_b2': tf.Variable(tf.truncated_normal(shape=[96], stddev=0.01)),
+        'block2_branch1_b1': tf.Variable(tf.truncated_normal(shape=[192], stddev=0.01))
     }
     with tf.name_scope('inception_stem'):
         with tf.name_scope('stem'):
@@ -98,23 +103,23 @@ def inception_stem(inputs):
 
 def inception_block_a(inputs):  # input size 35x35x384 output size 35x35x384
     weights = {
-        'branch_1_w1': tf.Variable(tf.truncated_normal([1, 1, 384, 64], stddev=0.1)),
-        'branch_1_w2': tf.Variable(tf.truncated_normal([3, 3, 64, 96], stddev=0.1)),
-        'branch_1_w3': tf.Variable(tf.truncated_normal([3, 3, 96, 96], stddev=0.1)),
-        'branch_2_w1': tf.Variable(tf.truncated_normal([1, 1, 384, 64], stddev=0.1)),
-        'branch_2_w2': tf.Variable(tf.truncated_normal([3, 3, 64, 96], stddev=0.1)),
-        'branch_3_w1': tf.Variable(tf.truncated_normal([1, 1, 384, 96], stddev=0.1)),
-        'branch_4_w1': tf.Variable(tf.truncated_normal([1, 1, 384, 96], stddev=0.1)),
+        'branch_1_w1': tf.Variable(tf.truncated_normal([1, 1, 384, 64], stddev=0.01)),
+        'branch_1_w2': tf.Variable(tf.truncated_normal([3, 3, 64, 96], stddev=0.01)),
+        'branch_1_w3': tf.Variable(tf.truncated_normal([3, 3, 96, 96], stddev=0.01)),
+        'branch_2_w1': tf.Variable(tf.truncated_normal([1, 1, 384, 64], stddev=0.01)),
+        'branch_2_w2': tf.Variable(tf.truncated_normal([3, 3, 64, 96], stddev=0.01)),
+        'branch_3_w1': tf.Variable(tf.truncated_normal([1, 1, 384, 96], stddev=0.01)),
+        'branch_4_w1': tf.Variable(tf.truncated_normal([1, 1, 384, 96], stddev=0.01)),
 
     }
     biases = {
-        'branch_1_b1': tf.Variable(tf.truncated_normal(shape=[64], stddev=0.1)),
-        'branch_1_b2': tf.Variable(tf.truncated_normal(shape=[96], stddev=0.1)),
-        'branch_1_b3': tf.Variable(tf.truncated_normal(shape=[96], stddev=0.1)),
-        'branch_2_b1': tf.Variable(tf.truncated_normal(shape=[64], stddev=0.1)),
-        'branch_2_b2': tf.Variable(tf.truncated_normal(shape=[96], stddev=0.1)),
-        'branch_3_b1': tf.Variable(tf.truncated_normal(shape=[96], stddev=0.1)),
-        'branch_4_b1': tf.Variable(tf.truncated_normal(shape=[96], stddev=0.1))
+        'branch_1_b1': tf.Variable(tf.truncated_normal(shape=[64], stddev=0.01)),
+        'branch_1_b2': tf.Variable(tf.truncated_normal(shape=[96], stddev=0.01)),
+        'branch_1_b3': tf.Variable(tf.truncated_normal(shape=[96], stddev=0.01)),
+        'branch_2_b1': tf.Variable(tf.truncated_normal(shape=[64], stddev=0.01)),
+        'branch_2_b2': tf.Variable(tf.truncated_normal(shape=[96], stddev=0.01)),
+        'branch_3_b1': tf.Variable(tf.truncated_normal(shape=[96], stddev=0.01)),
+        'branch_4_b1': tf.Variable(tf.truncated_normal(shape=[96], stddev=0.01))
     }
     with tf.name_scope('inception_block_a'):
         branch_1_c1 = conv2d_bn(inputs, weights['branch_1_w1'], strides=[1, 1, 1, 1], padding='SAME')
@@ -137,16 +142,16 @@ def inception_block_a(inputs):  # input size 35x35x384 output size 35x35x384
 
 def reduction_block_a(inputs):
     weights = {
-        'branch_1_w1': tf.Variable(tf.truncated_normal([1, 1, 384, 192], stddev=0.1)),
-        'branch_1_w2': tf.Variable(tf.truncated_normal([3, 3, 192, 224], stddev=0.1)),
-        'branch_1_w3': tf.Variable(tf.truncated_normal([3, 3, 224, 256], stddev=0.1)),
-        'branch_2_w1': tf.Variable(tf.truncated_normal([3, 3, 384, 384], stddev=0.1))
+        'branch_1_w1': tf.Variable(tf.truncated_normal([1, 1, 384, 192], stddev=0.01)),
+        'branch_1_w2': tf.Variable(tf.truncated_normal([3, 3, 192, 224], stddev=0.01)),
+        'branch_1_w3': tf.Variable(tf.truncated_normal([3, 3, 224, 256], stddev=0.01)),
+        'branch_2_w1': tf.Variable(tf.truncated_normal([3, 3, 384, 384], stddev=0.01))
     }
     biases = {
-        'branch_1_b1': tf.Variable(tf.truncated_normal(shape=[192], stddev=0.1)),
-        'branch_1_b2': tf.Variable(tf.truncated_normal(shape=[224], stddev=0.1)),
-        'branch_1_b3': tf.Variable(tf.truncated_normal(shape=[256], stddev=0.1)),
-        'branch_2_b1': tf.Variable(tf.truncated_normal(shape=[384], stddev=0.1))
+        'branch_1_b1': tf.Variable(tf.truncated_normal(shape=[192], stddev=0.01)),
+        'branch_1_b2': tf.Variable(tf.truncated_normal(shape=[224], stddev=0.01)),
+        'branch_1_b3': tf.Variable(tf.truncated_normal(shape=[256], stddev=0.01)),
+        'branch_2_b1': tf.Variable(tf.truncated_normal(shape=[384], stddev=0.01))
     }
     with tf.name_scope('reduction_block_a'):
         branch_1_c1 = conv2d_bn(inputs, weights['branch_1_w1'], strides=[1, 1, 1, 1], padding='SAME')
@@ -164,29 +169,29 @@ def reduction_block_a(inputs):
 
 def inception_block_b(inputs):  # input 17x17x1024 output 17x17x1024
     weights = {
-        'branch_1_w1': tf.Variable(tf.truncated_normal([1, 1, 1024, 192], stddev=0.1)),
-        'branch_1_w2': tf.Variable(tf.truncated_normal([1, 7, 192, 192], stddev=0.1)),
-        'branch_1_w3': tf.Variable(tf.truncated_normal([7, 1, 192, 224], stddev=0.1)),
-        'branch_1_w4': tf.Variable(tf.truncated_normal([1, 7, 224, 224], stddev=0.1)),
-        'branch_1_w5': tf.Variable(tf.truncated_normal([7, 1, 224, 256], stddev=0.1)),
-        'branch_2_w1': tf.Variable(tf.truncated_normal([1, 1, 1024, 192], stddev=0.1)),
-        'branch_3_w1': tf.Variable(tf.truncated_normal([1, 1, 1024, 384], stddev=0.1)),
-        'branch_2_w2': tf.Variable(tf.truncated_normal([1, 7, 192, 224], stddev=0.1)),
-        'branch_2_w3': tf.Variable(tf.truncated_normal([1, 7, 224, 256], stddev=0.1)),
-        'branch_4_w2': tf.Variable(tf.truncated_normal([1, 1, 1024, 128], stddev=0.1))
+        'branch_1_w1': tf.Variable(tf.truncated_normal([1, 1, 1024, 192], stddev=0.01)),
+        'branch_1_w2': tf.Variable(tf.truncated_normal([1, 7, 192, 192], stddev=0.01)),
+        'branch_1_w3': tf.Variable(tf.truncated_normal([7, 1, 192, 224], stddev=0.01)),
+        'branch_1_w4': tf.Variable(tf.truncated_normal([1, 7, 224, 224], stddev=0.01)),
+        'branch_1_w5': tf.Variable(tf.truncated_normal([7, 1, 224, 256], stddev=0.01)),
+        'branch_2_w1': tf.Variable(tf.truncated_normal([1, 1, 1024, 192], stddev=0.01)),
+        'branch_3_w1': tf.Variable(tf.truncated_normal([1, 1, 1024, 384], stddev=0.01)),
+        'branch_2_w2': tf.Variable(tf.truncated_normal([1, 7, 192, 224], stddev=0.01)),
+        'branch_2_w3': tf.Variable(tf.truncated_normal([1, 7, 224, 256], stddev=0.01)),
+        'branch_4_w2': tf.Variable(tf.truncated_normal([1, 1, 1024, 128], stddev=0.01))
 
     }
     biases = {
-        'branch_1_b1': tf.Variable(tf.truncated_normal(shape=[192], stddev=0.1)),
-        'branch_1_b2': tf.Variable(tf.truncated_normal(shape=[192], stddev=0.1)),
-        'branch_1_b3': tf.Variable(tf.truncated_normal(shape=[224], stddev=0.1)),
-        'branch_1_b4': tf.Variable(tf.truncated_normal(shape=[224], stddev=0.1)),
-        'branch_1_b5': tf.Variable(tf.truncated_normal(shape=[256], stddev=0.1)),
-        'branch_2_b1': tf.Variable(tf.truncated_normal(shape=[192], stddev=0.1)),
-        'branch_2_b2': tf.Variable(tf.truncated_normal(shape=[224], stddev=0.1)),
-        'branch_2_b3': tf.Variable(tf.truncated_normal(shape=[256], stddev=0.1)),
-        'branch_3_b1': tf.Variable(tf.truncated_normal(shape=[384], stddev=0.1)),
-        'branch_4_b2': tf.Variable(tf.truncated_normal(shape=[128], stddev=0.1))
+        'branch_1_b1': tf.Variable(tf.truncated_normal(shape=[192], stddev=0.01)),
+        'branch_1_b2': tf.Variable(tf.truncated_normal(shape=[192], stddev=0.01)),
+        'branch_1_b3': tf.Variable(tf.truncated_normal(shape=[224], stddev=0.01)),
+        'branch_1_b4': tf.Variable(tf.truncated_normal(shape=[224], stddev=0.01)),
+        'branch_1_b5': tf.Variable(tf.truncated_normal(shape=[256], stddev=0.01)),
+        'branch_2_b1': tf.Variable(tf.truncated_normal(shape=[192], stddev=0.01)),
+        'branch_2_b2': tf.Variable(tf.truncated_normal(shape=[224], stddev=0.01)),
+        'branch_2_b3': tf.Variable(tf.truncated_normal(shape=[256], stddev=0.01)),
+        'branch_3_b1': tf.Variable(tf.truncated_normal(shape=[384], stddev=0.01)),
+        'branch_4_b2': tf.Variable(tf.truncated_normal(shape=[128], stddev=0.01))
     }
     with tf.name_scope('inception_block_b'):
         with tf.name_scope('branch_1'):
@@ -219,20 +224,20 @@ def inception_block_b(inputs):  # input 17x17x1024 output 17x17x1024
 
 def reduction_block_b(inputs):  # input 17x17x1024 output 8x8x1536
     weights = {
-        'branch_1_w1': tf.Variable(tf.truncated_normal([1, 1, 1024, 256], stddev=0.1)),
-        'branch_1_w2': tf.Variable(tf.truncated_normal([1, 7, 256, 256], stddev=0.1)),
-        'branch_1_w3': tf.Variable(tf.truncated_normal([7, 1, 256, 320], stddev=0.1)),
-        'branch_1_w4': tf.Variable(tf.truncated_normal([3, 3, 320, 320], stddev=0.1)),
-        'branch_2_w1': tf.Variable(tf.truncated_normal([1, 1, 1024, 192], stddev=0.1)),
-        'branch_2_w2': tf.Variable(tf.truncated_normal([3, 3, 192, 192], stddev=0.1))
+        'branch_1_w1': tf.Variable(tf.truncated_normal([1, 1, 1024, 256], stddev=0.01)),
+        'branch_1_w2': tf.Variable(tf.truncated_normal([1, 7, 256, 256], stddev=0.01)),
+        'branch_1_w3': tf.Variable(tf.truncated_normal([7, 1, 256, 320], stddev=0.01)),
+        'branch_1_w4': tf.Variable(tf.truncated_normal([3, 3, 320, 320], stddev=0.01)),
+        'branch_2_w1': tf.Variable(tf.truncated_normal([1, 1, 1024, 192], stddev=0.01)),
+        'branch_2_w2': tf.Variable(tf.truncated_normal([3, 3, 192, 192], stddev=0.01))
     }
     biases = {
-        'branch_1_b1': tf.Variable(tf.truncated_normal(shape=[256], stddev=0.1)),
-        'branch_1_b2': tf.Variable(tf.truncated_normal(shape=[256], stddev=0.1)),
-        'branch_1_b3': tf.Variable(tf.truncated_normal(shape=[320], stddev=0.1)),
-        'branch_1_b4': tf.Variable(tf.truncated_normal(shape=[320], stddev=0.1)),
-        'branch_2_b1': tf.Variable(tf.truncated_normal(shape=[192], stddev=0.1)),
-        'branch_2_b2': tf.Variable(tf.truncated_normal(shape=[192], stddev=0.1))
+        'branch_1_b1': tf.Variable(tf.truncated_normal(shape=[256], stddev=0.01)),
+        'branch_1_b2': tf.Variable(tf.truncated_normal(shape=[256], stddev=0.01)),
+        'branch_1_b3': tf.Variable(tf.truncated_normal(shape=[320], stddev=0.01)),
+        'branch_1_b4': tf.Variable(tf.truncated_normal(shape=[320], stddev=0.01)),
+        'branch_2_b1': tf.Variable(tf.truncated_normal(shape=[192], stddev=0.01)),
+        'branch_2_b2': tf.Variable(tf.truncated_normal(shape=[192], stddev=0.01))
     }
     with tf.name_scope('inception_block_c'):
         with tf.name_scope('branch_1'):
@@ -256,28 +261,28 @@ def reduction_block_b(inputs):  # input 17x17x1024 output 8x8x1536
 
 def inception_block_c(inputs):
     weights = {
-        'branch_1_w1': tf.Variable(tf.truncated_normal([1, 1, 1536, 384], stddev=0.1)),
-        'branch_1_w2': tf.Variable(tf.truncated_normal([1, 3, 384, 448], stddev=0.1)),
-        'branch_1_w3': tf.Variable(tf.truncated_normal([3, 1, 448, 512], stddev=0.1)),
-        'branch_1_1_w1': tf.Variable(tf.truncated_normal([1, 3, 512, 256], stddev=0.1)),
-        'branch_1_2_w1': tf.Variable(tf.truncated_normal([3, 1, 512, 256], stddev=0.1)),
-        'branch_2_w1': tf.Variable(tf.truncated_normal([1, 1, 1536, 384], stddev=0.1)),
-        'branch_2_1_w1': tf.Variable(tf.truncated_normal([3, 1, 384, 256], stddev=0.1)),
-        'branch_2_2_w1': tf.Variable(tf.truncated_normal([1, 3, 384, 256], stddev=0.1)),
-        'branch_3_w1': tf.Variable(tf.truncated_normal([1, 1, 1536, 256], stddev=0.1)),
-        'branch_4_w1': tf.Variable(tf.truncated_normal([1, 1, 1536, 256], stddev=0.1))
+        'branch_1_w1': tf.Variable(tf.truncated_normal([1, 1, 1536, 384], stddev=0.01)),
+        'branch_1_w2': tf.Variable(tf.truncated_normal([1, 3, 384, 448], stddev=0.01)),
+        'branch_1_w3': tf.Variable(tf.truncated_normal([3, 1, 448, 512], stddev=0.01)),
+        'branch_1_1_w1': tf.Variable(tf.truncated_normal([1, 3, 512, 256], stddev=0.01)),
+        'branch_1_2_w1': tf.Variable(tf.truncated_normal([3, 1, 512, 256], stddev=0.01)),
+        'branch_2_w1': tf.Variable(tf.truncated_normal([1, 1, 1536, 384], stddev=0.01)),
+        'branch_2_1_w1': tf.Variable(tf.truncated_normal([3, 1, 384, 256], stddev=0.01)),
+        'branch_2_2_w1': tf.Variable(tf.truncated_normal([1, 3, 384, 256], stddev=0.01)),
+        'branch_3_w1': tf.Variable(tf.truncated_normal([1, 1, 1536, 256], stddev=0.01)),
+        'branch_4_w1': tf.Variable(tf.truncated_normal([1, 1, 1536, 256], stddev=0.01))
     }
     biases = {
-        'branch_1_b1': tf.Variable(tf.truncated_normal(shape=[384], stddev=0.1)),
-        'branch_1_b2': tf.Variable(tf.truncated_normal(shape=[448], stddev=0.1)),
-        'branch_1_b3': tf.Variable(tf.truncated_normal(shape=[512], stddev=0.1)),
-        'branch_1_1_b1': tf.Variable(tf.truncated_normal(shape=[256], stddev=0.1)),
-        'branch_1_2_b1': tf.Variable(tf.truncated_normal(shape=[256], stddev=0.1)),
-        'branch_2_b1': tf.Variable(tf.truncated_normal(shape=[384], stddev=0.1)),
-        'branch_2_1_b1': tf.Variable(tf.truncated_normal(shape=[256], stddev=0.1)),
-        'branch_2_2_b1': tf.Variable(tf.truncated_normal(shape=[256], stddev=0.1)),
-        'branch_3_b1': tf.Variable(tf.truncated_normal(shape=[256], stddev=0.1)),
-        'branch_4_b1': tf.Variable(tf.truncated_normal(shape=[256], stddev=0.1))
+        'branch_1_b1': tf.Variable(tf.truncated_normal(shape=[384], stddev=0.01)),
+        'branch_1_b2': tf.Variable(tf.truncated_normal(shape=[448], stddev=0.01)),
+        'branch_1_b3': tf.Variable(tf.truncated_normal(shape=[512], stddev=0.01)),
+        'branch_1_1_b1': tf.Variable(tf.truncated_normal(shape=[256], stddev=0.01)),
+        'branch_1_2_b1': tf.Variable(tf.truncated_normal(shape=[256], stddev=0.01)),
+        'branch_2_b1': tf.Variable(tf.truncated_normal(shape=[384], stddev=0.01)),
+        'branch_2_1_b1': tf.Variable(tf.truncated_normal(shape=[256], stddev=0.01)),
+        'branch_2_2_b1': tf.Variable(tf.truncated_normal(shape=[256], stddev=0.01)),
+        'branch_3_b1': tf.Variable(tf.truncated_normal(shape=[256], stddev=0.01)),
+        'branch_4_b1': tf.Variable(tf.truncated_normal(shape=[256], stddev=0.01))
     }
     with tf.name_scope('inception_block_c'):
         with tf.name_scope('branch_1'):
@@ -316,6 +321,7 @@ def inception_block_c(inputs):
 
 def model_function(x, y):
     net = inception_stem(x)
+    a = net
     # 4x inception-A
     for i in range(4):
         net = inception_block_a(net)
@@ -334,42 +340,50 @@ def model_function(x, y):
     layer_dropout_shape = net.get_shape().as_list()
     layer_flatten = tf.reshape(net,
                                [-1, layer_dropout_shape[1] * layer_dropout_shape[2] * layer_dropout_shape[3]])
-    W = tf.Variable(tf.truncated_normal([layer_flatten.get_shape().as_list()[1], 7], stddev=0.1))
-    b = tf.Variable(tf.constant(0.1, shape=[7]))
-    test = tf.matmul(layer_flatten, W) + b
+    W = tf.Variable(tf.truncated_normal([98304,7], stddev=0.01))
+    b = tf.Variable(tf.truncated_normal(shape=[7],stddev=0.01))
     logits = tf.nn.softmax(tf.matmul(layer_flatten, W) + b)
     cross_entropy = -tf.reduce_sum(y * tf.log(logits))
     correct_pred = tf.equal(tf.argmax(logits, 1), tf.argmax(y, 1))
     accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
-    return cross_entropy, accuracy
+    return cross_entropy, accuracy,a
 
 
 def main():
-    filename = os.path.join('..', 'datasets', 'snake299.training.tfrecord')
+    if sys.platform == 'Linux':
+        base_dir = os.path.join('/media', 'md0', 'xt1800i', 'Bite')
+
+    else:
+        base_dir = os.path.join('D:\\', 'Program', 'Bite')
+
+    filename = os.path.join(base_dir, 'datasets', 'snake299.training.tfrecord')
+    print(filename)
+    ckpt_dir = os.path.join(base_dir, 'ckpt')
     dataset = tfdata_generator(filename, batch_size=8)
     iterator = dataset.make_one_shot_iterator()
     x_image, y_label = iterator.get_next()
-    loss, accuracy = model_function(x_image, y_label)
-    train_step = tf.train.RMSPropOptimizer(learning_rate=0.0045, decay=0.94, epsilon=1.0).minimize(loss)
+    loss, accuracy ,log= model_function(x_image, y_label)
+    train_step = tf.train.AdamOptimizer(learning_rate=0.0045).minimize(loss)
 
     saver = tf.train.Saver()
     with tf.Session() as sess:
-        if os.path.isfile(os.path.join('..', 'saved_model', 'model.ckpt.index')):
+        if os.path.isfile(os.path.join(ckpt_dir, 'model.ckpt.index')):
             print("restore ckpt . . .")
-            saver.restore(sess, os.path.join('.', 'saved_model', 'model.ckpt'))
+            saver.restore(sess, os.path.join(ckpt_dir, 'model.ckpt'))
         else:
             print("new trainer . . .")
             sess.run(tf.global_variables_initializer())
             sess.run(tf.local_variables_initializer())
         epoch = 0
         while True:
-            _, l, acc = sess.run([train_step, loss, accuracy])
+            _, l, acc,lo = sess.run([train_step, loss, accuracy,log])
+            print(lo)
             print('epoch= {}, Loss = {}, acc= {}'.format(epoch, l, acc))
             if epoch % 10 == 0:
                 print('epoch= {}, Loss = {}, acc= {}'.format(epoch, l, acc))
             if (epoch + 1) % 500 == 0:
                 print('saving checkpoint . . .')
-                saver.save(sess, os.path.join('.', 'saved_model', 'model.ckpt'))
+                saver.save(sess, os.path.join(ckpt_dir, 'model.ckpt'))
             epoch += 1
 
 
