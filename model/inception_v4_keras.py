@@ -9,12 +9,13 @@ from tensorflow.python.keras.layers import Convolution2D, \
     Dropout, \
     Flatten
 from tensorflow.python.keras import regularizers, initializers
-from tensorflow.python.keras.callbacks import ModelCheckpoint
+from tensorflow.python.keras.callbacks import ModelCheckpoint, TensorBoard
 from tensorflow.python.keras.models import Model
 from tensorflow.python.keras.utils import multi_gpu_model
 import tensorflow as tf
 import os
 import platform
+
 
 def parse_tfrecord(example):
     img_features = tf.parse_single_example(
@@ -184,11 +185,10 @@ def keras_model():
 
 
 def train(ckpt=None, batch_size=32):
-
     if platform.system() == 'Windows':
         print('Running on Windows')
-        base_dir = os.path.join('D\\', 'Program', 'Bite')
-        save_path = os.path.join(base_dir, 'saved_model',
+        base_dir = os.path.join('D:\\', 'Program', 'Bite')
+        save_path = os.path.join(base_dir, 'ckpt',
                                  'weights-improvement-{epoch:02d}-{loss:.4f}-{acc:.2f}.hdf5')
         tfrecord = os.path.join(base_dir, 'datasets', 'snake299.training.tfrecord')
         training_set = tfdata_generator(filename=tfrecord, batch_size=batch_size)
@@ -222,20 +222,21 @@ def train(ckpt=None, batch_size=32):
 
     ckpt = ModelCheckpoint(filepath=save_path, monitor='acc', save_best_only=True,
                            save_weights_only=True, mode='auto', period=1)
-    callbacks_list = [ckpt]
+    tb = TensorBoard(log_dir='../train', write_grads=True, write_images=True, histogram_freq=1)
+    callbacks_list = [ckpt, tb]
 
-    parallel_model.fit(x=training_set.make_one_shot_iterator(), epochs=30000, steps_per_epoch=115,
+    parallel_model.fit(x=training_set.make_one_shot_iterator(), epochs=30000, steps_per_epoch=10,
                        callbacks=callbacks_list)
 
 
 if __name__ == '__main__':
     import sys
-
+    batch_size = 8
     try:
         if platform.system() == 'Windows':
             print('Running on Windows')
-            base_dir = os.path.join('D\\', 'Program', 'Bite')
-            save_path = os.path.join(base_dir, 'saved_model')
+            base_dir = os.path.join('D:\\', 'Program', 'Bite')
+            save_path = os.path.join(base_dir, 'ckpt')
         elif platform.system() == 'Linux':
             print('Running on Linux')
             base_dir = os.path.join('/media', 'md0', 'xt1800i', 'Bite')
@@ -243,6 +244,6 @@ if __name__ == '__main__':
         else:
             pass
         ckpt = os.path.join(save_path, sys.argv[1])
-        train(batch_size=32, ckpt=ckpt)
+        train(batch_size=batch_size, ckpt=ckpt)
     except:
-        train(batch_size=32)
+        train(batch_size=batch_size)
