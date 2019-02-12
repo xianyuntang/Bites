@@ -21,9 +21,9 @@ def parse_tfrecord(example):
 def tfdata_generator(filename, batch_size):
     dataset = tf.data.TFRecordDataset(filenames=[filename])
     dataset = dataset.map(parse_tfrecord)
-    dataset = dataset.shuffle(7316)
+    dataset = dataset.apply(tf.contrib.data.shuffle_and_repeat(7316))
+    dataset = dataset.prefetch(tf.contrib.data.AUTOTUNE)
     dataset = dataset.batch(batch_size)
-    dataset = dataset.repeat()
     return dataset
 
 
@@ -361,7 +361,7 @@ def model_function(x, y):
     return cross_entropy, accuracy
 
 
-def main():
+def main(unused_argv):
     if platform.system() == 'Linux':
         base_dir = os.path.join('/media', 'md0', 'xt1800i', 'Bite')
 
@@ -371,36 +371,40 @@ def main():
     filename = os.path.join(base_dir, 'datasets', 'snake299.training.tfrecord')
     print(filename)
     ckpt_dir = os.path.join(base_dir, 'ckpt')
-    dataset = tfdata_generator(filename, batch_size=8)
+    dataset = tfdata_generator(filename, batch_size=FLAGS.batch_size)
     iterator = dataset.make_one_shot_iterator()
     x_image, y_label = iterator.get_next()
 
     loss, accuracy = model_function(x_image, y_label)
-    train_step = tf.train.AdamOptimizer(learning_rate=0.045).minimize(loss)
+    train_step = tf.train.RMSPropOptimizer(learning_rate=0.045, decay=0.94, epsilon=1).minimize(loss)
 
     saver = tf.train.Saver()
-    with tf.Session() as sess:
+    config = tf.ConfigProto()
+    config.gpu_options.allow_growth = True
+    with tf.Session(config=config) as sess:
         merge = tf.summary.merge_all()
-        writer = tf.summary.FileWriter(os.path.join(base_dir, 'train'), sess.graph)
-        if os.path.isfile(os.path.join(ckpt_dir, 'model.ckpt.index')):
+        writer = tf.summary.FileWriter(os.path.join(base_dir, 'logs'), sess.graph)
+        if FLAGS.ckpt is not None:
             print("restore ckpt . . .")
-            saver.restore(sess, os.path.join(ckpt_dir, 'model.ckpt'))
+            saver.restore(sess, os.path.join(ckpt_dir, FLAGS.ckpt))
         else:
             print("new trainer . . .")
             sess.run(tf.global_variables_initializer())
             sess.run(tf.local_variables_initializer())
-        epoch = 1
+        i = 1
         while True:
             _, l, acc = sess.run([train_step, loss, accuracy])
-            print('epoch= {}, Loss = {}, acc= {}'.format(epoch, l, acc))
-            epoch += 1
-            if epoch % 50 == 0:
+            print('iterator= {}, Loss = {}, acc= {}'.format(i, l, acc))
+            if i % 50 == 0:
                 rs = sess.run(merge)
-                writer.add_summary(rs, epoch)
-            if epoch % 500 == 0:
-                saver.save(sess,ckpt_dir)
+                writer.add_summary(rs, i)
+            if i % 500 == 0:
+                saver.save(sess, os.path.join(ckpt_dir, f'model-{i}.ckpt'))
+            i += 1
+
 
 if __name__ == '__main__':
-    DEBUG = False
-
-    main()
+    FLAGS = tf.flags.FLAGS
+    tf.flags.DEFINE_string('ckpt', None, 'filename for checkpoint')
+    tf.flags.DEFINE_integer('batch_size', 32, 'batch_size')
+    tf.app.run()
