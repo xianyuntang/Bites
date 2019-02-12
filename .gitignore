@@ -4,3 +4,4 @@
 /processeddata/*
 /saved_model/*
 /.idea/*
+/train/*
