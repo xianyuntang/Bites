@@ -42,61 +42,62 @@ def conv2d_bn(inputs, filters, strides, padding):
 def inception_stem(inputs):
     weights = {
         'stem_w1': tf.Variable(tf.truncated_normal([3, 3, 3, 32], stddev=0.1)),
-        'stem_w2': tf.Variable(tf.truncated_normal([3, 3, 32, 32], stddev=0.1)),
-        'stem_w3': tf.Variable(tf.truncated_normal([3, 3, 32, 64], stddev=0.1)),
-        'stem_w4': tf.Variable(tf.truncated_normal([3, 3, 64, 96], stddev=0.1)),
-        'block1_branch1_w1': tf.Variable(tf.truncated_normal([1, 1, 160, 64], stddev=0.1)),
-        'block1_branch1_w2': tf.Variable(tf.truncated_normal([7, 1, 64, 64], stddev=0.1)),
-        'block1_branch1_w3': tf.Variable(tf.truncated_normal([1, 7, 64, 64], stddev=0.1)),
-        'block1_branch1_w4': tf.Variable(tf.truncated_normal([3, 3, 64, 96], stddev=0.1)),
-        'block1_branch2_w1': tf.Variable(tf.truncated_normal([1, 1, 160, 64], stddev=0.1)),
-        'block1_branch2_w2': tf.Variable(tf.truncated_normal([3, 3, 64, 96], stddev=0.1)),
-        'block2_branch1_w1': tf.Variable(tf.truncated_normal([3, 3, 192, 192], stddev=0.1))
+        'stem_w2': tf.Variable(tf.truncated_normal([3, 3, 32, 32])),
+        'stem_w3': tf.Variable(tf.truncated_normal([3, 3, 32, 64])),
+        'stem_w4': tf.Variable(tf.truncated_normal([3, 3, 64, 96])),
+        'block1_branch1_w1': tf.Variable(tf.truncated_normal([1, 1, 160, 64])),
+        'block1_branch1_w2': tf.Variable(tf.truncated_normal([7, 1, 64, 64])),
+        'block1_branch1_w3': tf.Variable(tf.truncated_normal([1, 7, 64, 64])),
+        'block1_branch1_w4': tf.Variable(tf.truncated_normal([3, 3, 64, 96])),
+        'block1_branch2_w1': tf.Variable(tf.truncated_normal([1, 1, 160, 64])),
+        'block1_branch2_w2': tf.Variable(tf.truncated_normal([3, 3, 64, 96])),
+        'block2_branch1_w1': tf.Variable(tf.truncated_normal([3, 3, 192, 192]))
 
     }
     biases = {
-        'stem_b1': tf.Variable(tf.constant(shape=[32], value=0)),
-        'stem_b2': tf.Variable(tf.constant(shape=[32], value=0)),
-        'stem_b3': tf.Variable(tf.constant(shape=[64], value=0)),
-        'stem_b4': tf.Variable(tf.constant(shape=[96], value=0)),
-        'block1_branch1_b1': tf.Variable(tf.constant(shape=[64], value=0)),
-        'block1_branch1_b2': tf.Variable(tf.constant(shape=[64], value=0)),
-        'block1_branch1_b3': tf.Variable(tf.constant(shape=[64], value=0)),
-        'block1_branch1_b4': tf.Variable(tf.constant(shape=[96], value=0)),
-        'block1_branch2_b1': tf.Variable(tf.constant(shape=[64], value=0)),
-        'block1_branch2_b2': tf.Variable(tf.constant(shape=[96], value=0)),
-        'block2_branch1_b1': tf.Variable(tf.constant(shape=[192], value=0))
+        'stem_b1': tf.Variable(tf.truncated_normal(shape=[32], stddev=0.1)),
+        'stem_b2': tf.Variable(tf.truncated_normal(shape=[32], stddev=0.1)),
+        'stem_b3': tf.Variable(tf.truncated_normal(shape=[64], stddev=0.1)),
+        'stem_b4': tf.Variable(tf.truncated_normal(shape=[96], stddev=0.1)),
+        'block1_branch1_b1': tf.Variable(tf.truncated_normal(shape=[64], stddev=0.1)),
+        'block1_branch1_b2': tf.Variable(tf.truncated_normal(shape=[64], stddev=0.1)),
+        'block1_branch1_b3': tf.Variable(tf.truncated_normal(shape=[64], stddev=0.1)),
+        'block1_branch1_b4': tf.Variable(tf.truncated_normal(shape=[96], stddev=0.1)),
+        'block1_branch2_b1': tf.Variable(tf.truncated_normal(shape=[64], stddev=0.1)),
+        'block1_branch2_b2': tf.Variable(tf.truncated_normal(shape=[96], stddev=0.1)),
+        'block2_branch1_b1': tf.Variable(tf.truncated_normal(shape=[192], stddev=0.1))
+
     }
     with tf.name_scope('inception_stem'):
         with tf.name_scope('stem'):
             stem_c1 = conv2d_bn(inputs, weights['stem_w1'], strides=[1, 2, 2, 1], padding='VALID')
-            stem_a1 = tf.nn.relu(stem_c1)
+            stem_a1 = tf.nn.relu(stem_c1 + biases['stem_b1'])
             stem_c2 = conv2d_bn(stem_a1, weights['stem_w2'], strides=[1, 1, 1, 1], padding='VALID')
-            stem_a2 = tf.nn.relu(stem_c2)
+            stem_a2 = tf.nn.relu(stem_c2 + biases['stem_b2'])
             stem_c3 = conv2d_bn(stem_a2, weights['stem_w3'], strides=[1, 1, 1, 1], padding='SAME')
-            stem_a3 = tf.nn.relu(stem_c3)
+            stem_a3 = tf.nn.relu(stem_c3 + biases['stem_b3'])
             stem_c4 = conv2d_bn(stem_a3, weights['stem_w4'], strides=[1, 2, 2, 1], padding='VALID')
-            stem_a4 = tf.nn.relu(stem_c4)
+            stem_a4 = tf.nn.relu(stem_c4 + biases['stem_b4'])
             branch_1_m4 = tf.nn.max_pool(stem_a3, ksize=[1, 3, 3, 1], strides=[1, 2, 2, 1], padding='VALID')
         net = tf.concat(axis=3, values=[stem_a4, branch_1_m4])
         with tf.name_scope('block_1'):
             branch_1_c1 = conv2d_bn(net, weights['block1_branch1_w1'], strides=[1, 1, 1, 1], padding='SAME')
-            branch_1_a1 = tf.nn.relu(branch_1_c1)
+            branch_1_a1 = tf.nn.relu(branch_1_c1 + biases['block1_branch1_b1'])
             branch_1_c2 = conv2d_bn(branch_1_a1, weights['block1_branch1_w2'], strides=[1, 1, 1, 1], padding='SAME')
-            branch_1_a2 = tf.nn.relu(branch_1_c2)
+            branch_1_a2 = tf.nn.relu(branch_1_c2 + biases['block1_branch1_b2'])
             branch_1_c3 = conv2d_bn(branch_1_a2, weights['block1_branch1_w3'], strides=[1, 1, 1, 1], padding='SAME')
-            branch_1_a3 = tf.nn.relu(branch_1_c3)
+            branch_1_a3 = tf.nn.relu(branch_1_c3 + biases['block1_branch1_b3'])
             branch_1_c4 = conv2d_bn(branch_1_a3, weights['block1_branch1_w4'], strides=[1, 1, 1, 1], padding='VALID')
-            branch_1_a4 = tf.nn.relu(branch_1_c4)
+            branch_1_a4 = tf.nn.relu(branch_1_c4 + biases['block1_branch1_b4'])
             branch_2_c1 = conv2d_bn(net, weights['block1_branch2_w1'], strides=[1, 1, 1, 1], padding='SAME')
-            branch_2_a1 = tf.nn.relu(branch_2_c1)
+            branch_2_a1 = tf.nn.relu(branch_2_c1 + biases['block1_branch2_b1'])
             branch_2_c2 = conv2d_bn(branch_2_a1, weights['block1_branch2_w2'], strides=[1, 1, 1, 1], padding='VALID')
-            branch_2_a2 = tf.nn.relu(branch_2_c2)
+            branch_2_a2 = tf.nn.relu(branch_2_c2 + biases['block1_branch2_b2'])
         net = tf.concat(axis=3, values=[branch_1_a4, branch_2_a2])
         with tf.name_scope('block_2'):
             branch_1_m1 = tf.nn.max_pool(net, ksize=[1, 3, 3, 1], strides=[1, 2, 2, 1], padding='VALID')
             branch_2_c1 = conv2d_bn(net, weights['block2_branch1_w1'], strides=[1, 2, 2, 1], padding='VALID')
-            branch_2_a1 = tf.nn.relu(branch_2_c1)
+            branch_2_a1 = tf.nn.relu(branch_2_c1 + biases['block2_branch1_b1'])
 
     return tf.concat(axis=3, values=[branch_1_m1, branch_2_a1])
 
@@ -109,7 +110,7 @@ def inception_block_a(inputs):  # input size 35x35x384 output size 35x35x384
         'branch_2_w1': tf.Variable(tf.truncated_normal([1, 1, 384, 64], stddev=0.1)),
         'branch_2_w2': tf.Variable(tf.truncated_normal([3, 3, 64, 96], stddev=0.1)),
         'branch_3_w1': tf.Variable(tf.truncated_normal([1, 1, 384, 96], stddev=0.1)),
-        'branch_4_w1': tf.Variable(tf.truncated_normal([1, 1, 384, 96], stddev=0.1)),
+        'branch_4_w1': tf.Variable(tf.truncated_normal([1, 1, 384, 96], stddev=0.1))
 
     }
     biases = {
@@ -120,23 +121,24 @@ def inception_block_a(inputs):  # input size 35x35x384 output size 35x35x384
         'branch_2_b2': tf.Variable(tf.truncated_normal(shape=[96], stddev=0.1)),
         'branch_3_b1': tf.Variable(tf.truncated_normal(shape=[96], stddev=0.1)),
         'branch_4_b1': tf.Variable(tf.truncated_normal(shape=[96], stddev=0.1))
+
     }
     with tf.name_scope('inception_block_a'):
         branch_1_c1 = conv2d_bn(inputs, weights['branch_1_w1'], strides=[1, 1, 1, 1], padding='SAME')
-        branch_1_a1 = tf.nn.relu(branch_1_c1)
+        branch_1_a1 = tf.nn.relu(branch_1_c1 + biases['branch_1_b1'])
         branch_1_c2 = conv2d_bn(branch_1_a1, weights['branch_1_w2'], strides=[1, 1, 1, 1], padding='SAME')
-        branch_1_a2 = tf.nn.relu(branch_1_c2)
+        branch_1_a2 = tf.nn.relu(branch_1_c2 + biases['branch_1_b2'])
         branch_1_c3 = conv2d_bn(branch_1_a2, weights['branch_1_w3'], strides=[1, 1, 1, 1], padding='SAME')
-        branch_1_a3 = tf.nn.relu(branch_1_c3)
+        branch_1_a3 = tf.nn.relu(branch_1_c3 + biases['branch_1_b3'])
         branch_2_c1 = conv2d_bn(inputs, weights['branch_2_w1'], strides=[1, 1, 1, 1], padding='SAME')
-        branch_2_a1 = tf.nn.relu(branch_2_c1)
+        branch_2_a1 = tf.nn.relu(branch_2_c1 + biases['branch_2_b1'])
         branch_2_c2 = conv2d_bn(branch_2_a1, weights['branch_2_w2'], strides=[1, 1, 1, 1], padding='SAME')
-        branch_2_a2 = tf.nn.relu(branch_2_c2)
+        branch_2_a2 = tf.nn.relu(branch_2_c2 + biases['branch_2_b2'])
         branch_3_c1 = conv2d_bn(inputs, weights['branch_3_w1'], strides=[1, 1, 1, 1], padding='SAME')
-        branch_3_a1 = tf.nn.relu(branch_3_c1)
+        branch_3_a1 = tf.nn.relu(branch_3_c1 + biases['branch_3_b1'])
         branch_4_p1 = tf.nn.avg_pool(inputs, ksize=[1, 2, 2, 1], strides=[1, 1, 1, 1], padding='SAME')
         branch_4_c1 = conv2d_bn(branch_4_p1, weights['branch_4_w1'], strides=[1, 1, 1, 1], padding='SAME')
-        branch_4_a1 = tf.nn.relu(branch_4_c1)
+        branch_4_a1 = tf.nn.relu(branch_4_c1 + biases['branch_4_b1'])
     return tf.concat(axis=3, values=[branch_1_a3, branch_2_a2, branch_3_a1, branch_4_a1])
 
 
@@ -146,22 +148,24 @@ def reduction_block_a(inputs):
         'branch_1_w2': tf.Variable(tf.truncated_normal([3, 3, 192, 224], stddev=0.1)),
         'branch_1_w3': tf.Variable(tf.truncated_normal([3, 3, 224, 256], stddev=0.1)),
         'branch_2_w1': tf.Variable(tf.truncated_normal([3, 3, 384, 384], stddev=0.1))
+
     }
     biases = {
         'branch_1_b1': tf.Variable(tf.truncated_normal(shape=[192], stddev=0.1)),
         'branch_1_b2': tf.Variable(tf.truncated_normal(shape=[224], stddev=0.1)),
         'branch_1_b3': tf.Variable(tf.truncated_normal(shape=[256], stddev=0.1)),
         'branch_2_b1': tf.Variable(tf.truncated_normal(shape=[384], stddev=0.1))
+
     }
     with tf.name_scope('reduction_block_a'):
         branch_1_c1 = conv2d_bn(inputs, weights['branch_1_w1'], strides=[1, 1, 1, 1], padding='SAME')
-        branch_1_a1 = tf.nn.relu(branch_1_c1)
+        branch_1_a1 = tf.nn.relu(branch_1_c1 + biases['branch_1_b1'])
         branch_1_c2 = conv2d_bn(branch_1_a1, weights['branch_1_w2'], strides=[1, 1, 1, 1], padding='SAME')
-        branch_1_a2 = tf.nn.relu(branch_1_c2)
+        branch_1_a2 = tf.nn.relu(branch_1_c2 + biases['branch_1_b2'])
         branch_1_c3 = conv2d_bn(branch_1_a2, weights['branch_1_w3'], strides=[1, 2, 2, 1], padding='VALID')
-        branch_1_a3 = tf.nn.relu(branch_1_c3)
+        branch_1_a3 = tf.nn.relu(branch_1_c3 + biases['branch_1_b3'])
         branch_2_c1 = conv2d_bn(inputs, weights['branch_2_w1'], strides=[1, 2, 2, 1], padding='VALID')
-        branch_2_a1 = tf.nn.relu(branch_2_c1)
+        branch_2_a1 = tf.nn.relu(branch_2_c1 + biases['branch_2_b1'])
         branch_3_m1 = tf.nn.max_pool(inputs, ksize=[1, 3, 3, 1], strides=[1, 2, 2, 1], padding='VALID')
 
     return tf.concat(axis=3, values=[branch_1_a3, branch_2_a1, branch_3_m1])
@@ -192,33 +196,34 @@ def inception_block_b(inputs):  # input 17x17x1024 output 17x17x1024
         'branch_2_b3': tf.Variable(tf.truncated_normal(shape=[256], stddev=0.1)),
         'branch_3_b1': tf.Variable(tf.truncated_normal(shape=[384], stddev=0.1)),
         'branch_4_b2': tf.Variable(tf.truncated_normal(shape=[128], stddev=0.1))
+
     }
     with tf.name_scope('inception_block_b'):
         with tf.name_scope('branch_1'):
             branch_1_c1 = conv2d_bn(inputs, weights['branch_1_w1'], strides=[1, 1, 1, 1], padding='SAME')
-            branch_1_a1 = tf.nn.relu(branch_1_c1)
+            branch_1_a1 = tf.nn.relu(branch_1_c1 + biases['branch_1_b1'])
             branch_1_c2 = conv2d_bn(branch_1_a1, weights['branch_1_w2'], strides=[1, 1, 1, 1], padding='SAME')
-            branch_1_a2 = tf.nn.relu(branch_1_c2)
+            branch_1_a2 = tf.nn.relu(branch_1_c2 + biases['branch_1_b2'])
             branch_1_c3 = conv2d_bn(branch_1_a2, weights['branch_1_w3'], strides=[1, 1, 1, 1], padding='SAME')
-            branch_1_a3 = tf.nn.relu(branch_1_c3)
+            branch_1_a3 = tf.nn.relu(branch_1_c3 + biases['branch_1_b3'])
             branch_1_c4 = conv2d_bn(branch_1_a3, weights['branch_1_w4'], strides=[1, 1, 1, 1], padding='SAME')
-            branch_1_a4 = tf.nn.relu(branch_1_c4)
+            branch_1_a4 = tf.nn.relu(branch_1_c4 + biases['branch_1_b4'])
             branch_1_c5 = conv2d_bn(branch_1_a4, weights['branch_1_w5'], strides=[1, 1, 1, 1], padding='SAME')
-            branch_1_a5 = tf.nn.relu(branch_1_c5)
+            branch_1_a5 = tf.nn.relu(branch_1_c5 + biases['branch_1_b5'])
         with tf.name_scope('branch_2'):
             branch_2_c1 = conv2d_bn(inputs, weights['branch_2_w1'], strides=[1, 1, 1, 1], padding='SAME')
-            branch_2_a1 = tf.nn.relu(branch_2_c1)
+            branch_2_a1 = tf.nn.relu(branch_2_c1 + biases['branch_2_b1'])
             branch_2_c2 = conv2d_bn(branch_2_a1, weights['branch_2_w2'], strides=[1, 1, 1, 1], padding='SAME')
-            branch_2_a2 = tf.nn.relu(branch_2_c2)
+            branch_2_a2 = tf.nn.relu(branch_2_c2 + biases['branch_2_b2'])
             branch_2_c3 = conv2d_bn(branch_2_a2, weights['branch_2_w3'], strides=[1, 1, 1, 1], padding='SAME')
-            branch_2_a3 = tf.nn.relu(branch_2_c3)
+            branch_2_a3 = tf.nn.relu(branch_2_c3 + biases['branch_2_b3'])
         with tf.name_scope('branch_3'):
             branch_3_c1 = conv2d_bn(inputs, weights['branch_3_w1'], strides=[1, 1, 1, 1], padding='SAME')
-            branch_3_a1 = tf.nn.relu(branch_3_c1)
+            branch_3_a1 = tf.nn.relu(branch_3_c1 + biases['branch_3_b1'])
         with tf.name_scope('branch_4'):
             branch_4_p1 = tf.nn.avg_pool(inputs, ksize=[1, 2, 2, 1], strides=[1, 1, 1, 1], padding='SAME')
             branch_4_c2 = conv2d_bn(branch_4_p1, weights['branch_4_w2'], strides=[1, 1, 1, 1], padding='SAME')
-            branch_4_a2 = tf.nn.relu(branch_4_c2)
+            branch_4_a2 = tf.nn.relu(branch_4_c2 + biases['branch_4_b2'])
     return tf.concat(axis=3, values=[branch_1_a5, branch_2_a3, branch_3_a1, branch_4_a2])
 
 
@@ -230,6 +235,7 @@ def reduction_block_b(inputs):  # input 17x17x1024 output 8x8x1536
         'branch_1_w4': tf.Variable(tf.truncated_normal([3, 3, 320, 320], stddev=0.1)),
         'branch_2_w1': tf.Variable(tf.truncated_normal([1, 1, 1024, 192], stddev=0.1)),
         'branch_2_w2': tf.Variable(tf.truncated_normal([3, 3, 192, 192], stddev=0.1))
+
     }
     biases = {
         'branch_1_b1': tf.Variable(tf.truncated_normal(shape=[256], stddev=0.1)),
@@ -238,22 +244,23 @@ def reduction_block_b(inputs):  # input 17x17x1024 output 8x8x1536
         'branch_1_b4': tf.Variable(tf.truncated_normal(shape=[320], stddev=0.1)),
         'branch_2_b1': tf.Variable(tf.truncated_normal(shape=[192], stddev=0.1)),
         'branch_2_b2': tf.Variable(tf.truncated_normal(shape=[192], stddev=0.1))
+
     }
     with tf.name_scope('inception_block_c'):
         with tf.name_scope('branch_1'):
             branch_1_c1 = conv2d_bn(inputs, weights['branch_1_w1'], strides=[1, 1, 1, 1], padding='SAME')
-            branch_1_a1 = tf.nn.relu(branch_1_c1)
+            branch_1_a1 = tf.nn.relu(branch_1_c1 + biases['branch_1_b1'])
             branch_1_c2 = conv2d_bn(branch_1_a1, weights['branch_1_w2'], strides=[1, 1, 1, 1], padding='SAME')
-            branch_1_a2 = tf.nn.relu(branch_1_c2)
+            branch_1_a2 = tf.nn.relu(branch_1_c2 + biases['branch_1_b2'])
             branch_1_c3 = conv2d_bn(branch_1_a2, weights['branch_1_w3'], strides=[1, 1, 1, 1], padding='SAME')
-            branch_1_a3 = tf.nn.relu(branch_1_c3)
+            branch_1_a3 = tf.nn.relu(branch_1_c3 + biases['branch_1_b3'])
             branch_1_c4 = conv2d_bn(branch_1_a3, weights['branch_1_w4'], strides=[1, 2, 2, 1], padding='VALID')
-            branch_1_a4 = tf.nn.relu(branch_1_c4)
+            branch_1_a4 = tf.nn.relu(branch_1_c4 + biases['branch_1_b4'])
         with tf.name_scope('branch_2'):
             branch_2_c1 = conv2d_bn(inputs, weights['branch_2_w1'], strides=[1, 1, 1, 1], padding='SAME')
-            branch_2_a1 = tf.nn.relu(branch_2_c1)
+            branch_2_a1 = tf.nn.relu(branch_2_c1 + biases['branch_2_b1'])
             branch_2_c2 = conv2d_bn(branch_2_a1, weights['branch_2_w2'], strides=[1, 2, 2, 1], padding='VALID')
-            branch_2_a2 = tf.nn.relu(branch_2_c2)
+            branch_2_a2 = tf.nn.relu(branch_2_c2 + biases['branch_2_b2'])
         with tf.name_scope('branch_3'):
             branch_3_m1 = tf.nn.max_pool(inputs, ksize=[1, 3, 3, 1], strides=[1, 2, 2, 1], padding='VALID')
         return tf.concat(axis=3, values=[branch_3_m1, branch_2_a2, branch_1_a4])
@@ -271,6 +278,7 @@ def inception_block_c(inputs):
         'branch_2_2_w1': tf.Variable(tf.truncated_normal([1, 3, 384, 256], stddev=0.1)),
         'branch_3_w1': tf.Variable(tf.truncated_normal([1, 1, 1536, 256], stddev=0.1)),
         'branch_4_w1': tf.Variable(tf.truncated_normal([1, 1, 1536, 256], stddev=0.1))
+
     }
     biases = {
         'branch_1_b1': tf.Variable(tf.truncated_normal(shape=[384], stddev=0.1)),
@@ -283,37 +291,38 @@ def inception_block_c(inputs):
         'branch_2_2_b1': tf.Variable(tf.truncated_normal(shape=[256], stddev=0.1)),
         'branch_3_b1': tf.Variable(tf.truncated_normal(shape=[256], stddev=0.1)),
         'branch_4_b1': tf.Variable(tf.truncated_normal(shape=[256], stddev=0.1))
+
     }
     with tf.name_scope('inception_block_c'):
         with tf.name_scope('branch_1'):
             branch_1_c1 = conv2d_bn(inputs, weights['branch_1_w1'], strides=[1, 1, 1, 1], padding='SAME')
-            branch_1_a1 = tf.nn.relu(branch_1_c1)
+            branch_1_a1 = tf.nn.relu(branch_1_c1 + biases['branch_1_b1'])
             branch_1_c2 = conv2d_bn(branch_1_a1, weights['branch_1_w2'], strides=[1, 1, 1, 1], padding='SAME')
-            branch_1_a2 = tf.nn.relu(branch_1_c2)
+            branch_1_a2 = tf.nn.relu(branch_1_c2 + biases['branch_1_b2'])
             branch_1_c3 = conv2d_bn(branch_1_a2, weights['branch_1_w3'], strides=[1, 1, 1, 1], padding='SAME')
-            branch_1_a3 = tf.nn.relu(branch_1_c3)
+            branch_1_a3 = tf.nn.relu(branch_1_c3 + biases['branch_1_b3'])
             with tf.name_scope('branch_1_1'):
                 branch_1_1_c1 = conv2d_bn(branch_1_a3, weights['branch_1_1_w1'], strides=[1, 1, 1, 1], padding='SAME')
-                branch_1_1_a1 = tf.nn.relu(branch_1_1_c1)
+                branch_1_1_a1 = tf.nn.relu(branch_1_1_c1 + biases['branch_1_1_b1'])
             with tf.name_scope('branch_1_2'):
                 branch_1_2_c1 = conv2d_bn(branch_1_a3, weights['branch_1_2_w1'], strides=[1, 1, 1, 1], padding='SAME')
-                branch_1_2_a1 = tf.nn.relu(branch_1_2_c1)
+                branch_1_2_a1 = tf.nn.relu(branch_1_2_c1 + biases['branch_1_2_b1'])
         with tf.name_scope('branch_2'):
             branch_2_c1 = conv2d_bn(inputs, weights['branch_2_w1'], strides=[1, 1, 1, 1], padding='SAME')
-            branch_2_a1 = tf.nn.relu(branch_2_c1)
+            branch_2_a1 = tf.nn.relu(branch_2_c1 + biases['branch_2_b1'])
             with tf.name_scope('branch_2_1'):
                 branch_2_1_c1 = conv2d_bn(branch_2_a1, weights['branch_2_1_w1'], strides=[1, 1, 1, 1], padding='SAME')
-                branch_2_1_a1 = tf.nn.relu(branch_2_1_c1)
+                branch_2_1_a1 = tf.nn.relu(branch_2_1_c1 + biases['branch_2_1_b1'])
             with tf.name_scope('branch_2_2'):
                 branch_2_2_c1 = conv2d_bn(branch_2_a1, weights['branch_2_2_w1'], strides=[1, 1, 1, 1], padding='SAME')
-                branch_2_2_a1 = tf.nn.relu(branch_2_2_c1)
+                branch_2_2_a1 = tf.nn.relu(branch_2_2_c1 + biases['branch_2_2_b1'])
         with tf.name_scope('branch_3'):
             branch_3_c1 = conv2d_bn(inputs, weights['branch_3_w1'], strides=[1, 1, 1, 1], padding='SAME')
-            branch_3_a1 = tf.nn.relu(branch_3_c1)
+            branch_3_a1 = tf.nn.relu(branch_3_c1 + biases['branch_3_b1'])
         with tf.name_scope('branch_4'):
             branch_4_p1 = tf.nn.avg_pool(inputs, ksize=[1, 2, 2, 1], strides=[1, 1, 1, 1], padding='SAME')
             branch_4_c1 = conv2d_bn(branch_4_p1, weights['branch_4_w1'], strides=[1, 1, 1, 1], padding='SAME')
-            branch_4_a1 = tf.nn.relu(branch_4_c1)
+            branch_4_a1 = tf.nn.relu(branch_4_c1 + biases['branch_4_b1'])
 
     return tf.concat(axis=3,
                      values=[branch_1_1_a1, branch_1_2_a1, branch_2_1_a1, branch_2_2_a1, branch_3_a1, branch_4_a1])
@@ -388,7 +397,8 @@ def main():
             if epoch % 50 == 0:
                 rs = sess.run(merge)
                 writer.add_summary(rs, epoch)
-
+            if epoch % 500 == 0:
+                saver.save(sess,ckpt_dir)
 
 if __name__ == '__main__':
     DEBUG = False
