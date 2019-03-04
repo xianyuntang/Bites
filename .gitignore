@@ -1,7 +1,4 @@
 /datasets/*
-/origindata/*
-/processeddata/*
-/saved_model/*
 /.idea/*
 /train/*
 /ckpt/*

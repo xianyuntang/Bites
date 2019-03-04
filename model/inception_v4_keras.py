@@ -8,6 +8,7 @@ from tensorflow.python.keras.layers import Convolution2D, \
     Dense, \
     Dropout, \
     Flatten
+from tensorflow.python.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.python.keras import regularizers, initializers
 from tensorflow.python.keras.callbacks import ModelCheckpoint, TensorBoard
 from tensorflow.python.keras.models import Model
@@ -15,25 +16,46 @@ from tensorflow.python.keras.utils import multi_gpu_model
 import tensorflow as tf
 import os
 import platform
+import random
 
 
-def parse_tfrecord(example):
-    img_features = tf.parse_single_example(
-        example,
-        features={'Label': tf.FixedLenFeature([], tf.int64),
-                  'Raw_Image': tf.FixedLenFeature([], tf.string), })
-    image = tf.decode_raw(img_features['Raw_Image'], tf.uint8)
-    image = tf.reshape(image, [299, 299, 3])
-    image = tf.cast(image, dtype=tf.float32)
-    image = tf.divide(image, 255)
-    label = tf.cast(img_features['Label'], tf.int32)
-    label = tf.one_hot(label, depth=7)
-    return image, label
+def tfdata_generator(filename, batch_size, aug=False):
+    def parse_tfrecord(example):
+        img_features = tf.parse_single_example(
+            example,
+            features={'Label': tf.FixedLenFeature([], tf.int64),
+                      'Raw_Image': tf.FixedLenFeature([], tf.string), })
+        image = tf.decode_raw(img_features['Raw_Image'], tf.uint8)
+        image = tf.reshape(image, [299, 299, 3])
 
+        image = tf.cast(image, dtype=tf.float32)
+        image = tf.divide(image, 255)
+        label = tf.cast(img_features['Label'], tf.int32)
+        label = tf.one_hot(label, depth=7)
+        if aug is True:
+            operation = []
+            for i in range(6):
+                operation.append(random.randint(0, 1))
+            print(operation[0] is True)
+            if operation[0]:
+                image = tf.image.random_brightness(image, max_delta=0.2)
+            if operation[1]:
+                image = tf.image.random_crop(image, [200, 200, 3])
+                image = tf.image.resize_images(image, (299, 299), method=random.randint(0, 3))
+            if operation[2]:
+                image = tf.image.random_contrast(image, 0.5, 1.5)
+            if operation[3]:
+                image = tf.contrib.image.rotate(image, 30)
+            if operation[4]:
+                image = tf.image.random_hue(image, max_delta=0.05)
+            if operation[5]:
+                image = tf.image.random_saturation(image, 0, 2)
+            image = tf.image.random_flip_left_right(image)
+            image = tf.image.random_flip_up_down(image)
+        return image, label
 
-def tfdata_generator(filename, batch_size):
     dataset = tf.data.TFRecordDataset(filenames=[filename])
-    dataset = dataset.map(parse_tfrecord, num_parallel_calls=12)
+    dataset = dataset.map(parse_tfrecord, num_parallel_calls=40)
     dataset = dataset.apply(tf.contrib.data.shuffle_and_repeat(7316))
     dataset = dataset.prefetch(tf.contrib.data.AUTOTUNE)
     dataset = dataset.batch(batch_size)
@@ -43,9 +65,7 @@ def tfdata_generator(filename, batch_size):
 def conv2d_bn(x, n_filter, n_row, n_col, padding='same', stride=(1, 1), use_bias=False):
     x = Convolution2D(n_filter, (n_row, n_col), strides=stride, padding=padding, use_bias=use_bias,
                       kernel_regularizer=regularizers.l2(0.00004),
-                      kernel_initializer=initializers.VarianceScaling(scale=2.0, mode='fan_in',
-                                                                      distribution='normal',
-                                                                      seed=None))(x)
+                      kernel_initializer=initializers.TruncatedNormal(stddev=0.1))(x)
     x = BatchNormalization(momentum=0.9997, scale=False)(x)
     x = Activation('relu')(x)
     return x
@@ -176,74 +196,80 @@ def keras_model():
     for i in range(3):
         net = inception_block_c(net)
     net = AveragePooling2D(8, 8, padding='valid')(net)
-    net = Dropout(0.5)(net)
+    net = Dropout(0.2)(net)
     net = Flatten()(net)
     outputs = Dense(units=7, activation='softmax')(net)
 
-    model = Model(inputs, outputs, name='inception_v4')
+    model = Model(inputs, outputs, name='inception_v4_snake')
+
     return model
 
 
-def train(ckpt=None, batch_size=32):
+def get_next_batch(dataset_iterator):
+    image, label = dataset_iterator.get_next()
+    return image.numpy(), label.numpy()
+
+
+def main(unused_argv):
     if platform.system() == 'Windows':
         print('Running on Windows')
-        base_dir = os.path.join('D:\\', 'Program', 'Bite')
+        base_dir = os.path.join('E:\\', 'Program', 'Bite')
         save_path = os.path.join(base_dir, 'ckpt',
                                  'weights-improvement-{epoch:02d}-{loss:.4f}-{acc:.2f}.hdf5')
-        tfrecord = os.path.join(base_dir, 'datasets', 'snake299.training.tfrecord')
-        training_set = tfdata_generator(filename=tfrecord, batch_size=batch_size)
+
+
     elif platform.system() == 'Linux':
         print('Running on Linux')
         base_dir = os.path.join('/media', 'md0', 'xt1800i', 'Bite')
         save_path = os.path.join(base_dir, 'ckpt',
                                  'weights-improvement-{epoch:02d}-{loss:.4f}-{acc:.2f}.hdf5')
-        tfrecord = os.path.join(base_dir, 'datasets', 'snake299.training.tfrecord')
-        training_set = tfdata_generator(filename=tfrecord, batch_size=batch_size)
+
     else:
         print('Running on unsupported system')
         return
 
+
+    tfrecord = os.path.join(base_dir, 'datasets', 'tfrecord', 'snake_all.tfrecord')
     with tf.device('/cpu:0'):
         model = keras_model()
-
-    if ckpt is not None:
+        training_set = tfdata_generator(filename=tfrecord, batch_size=FLAGS.batch_size, aug=True)
+        validation_set = tfdata_generator(filename=tfrecord, batch_size=FLAGS.batch_size)
+    if FLAGS.ckpt is not None:
         print('loading weights')
-        model.load_weights(ckpt)
+        model.load_weights(FLAGS.ckpt)
     try:
         parallel_model = multi_gpu_model(model, gpus=2)
-        print('Training using multiple GPUs')
+        print('Training on multiple GPUs')
     except:
         parallel_model = model
-        print('Training using single GPU')
-    optimizer = tf.train.RMSPropOptimizer(learning_rate=0.045, decay=0.94, epsilon=1, momentum=0.9)
+        print('Training on single GPU')
+    global_step = tf.Variable(0, trainable=False)
+    learning_rate = tf.train.exponential_decay(learning_rate=0.001, global_step=global_step,
+                                               staircase=True, decay_steps=int(18288 / FLAGS.batch_size), decay_rate=0.96)
+    # learning_rate = tf.keras.optimizers.
+    optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
 
+    print(model.summary())
     parallel_model.compile(optimizer=optimizer, loss='categorical_crossentropy'
                            , metrics=['accuracy'])
 
-    ckpt = ModelCheckpoint(filepath=save_path, monitor='acc', save_best_only=True,
-                           save_weights_only=True, mode='auto', period=1)
-    tb = TensorBoard(log_dir='../train', write_grads=True, write_images=True, histogram_freq=1)
-    callbacks_list = [ckpt, tb]
+    ckpt = ModelCheckpoint(filepath=save_path, monitor='val_loss', save_best_only=False,
+                           save_weights_only=True, mode='auto', period=10)
+    callbacks_list = [ckpt]
 
-    parallel_model.fit(x=training_set.make_one_shot_iterator(), epochs=30000, steps_per_epoch=10,
+    parallel_model.fit(x=training_set.make_one_shot_iterator(),
+                       steps_per_epoch=int(18288 / FLAGS.batch_size),
+                       batch_size=FLAGS.batch_size,
+                       epochs=500000,
+                       validation_data=validation_set.make_one_shot_iterator(),
+                       validation_steps=int(18288 / FLAGS.batch_size),
                        callbacks=callbacks_list)
 
 
 if __name__ == '__main__':
-    import sys
-    batch_size = 8
-    try:
-        if platform.system() == 'Windows':
-            print('Running on Windows')
-            base_dir = os.path.join('D:\\', 'Program', 'Bite')
-            save_path = os.path.join(base_dir, 'ckpt')
-        elif platform.system() == 'Linux':
-            print('Running on Linux')
-            base_dir = os.path.join('/media', 'md0', 'xt1800i', 'Bite')
-            save_path = os.path.join(base_dir, 'ckpt')
-        else:
-            pass
-        ckpt = os.path.join(save_path, sys.argv[1])
-        train(batch_size=batch_size, ckpt=ckpt)
-    except:
-        train(batch_size=batch_size)
+    tf.enable_eager_execution()
+    FLAGS = tf.flags.FLAGS
+    tf.flags.DEFINE_string('ckpt', None, 'filename for checkpoint')
+    tf.flags.DEFINE_integer('batch_size', 32, 'batch_size')
+
+    tf.app.run()
