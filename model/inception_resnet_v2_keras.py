@@ -8,6 +8,8 @@ import os
 import random
 import platform
 
+
+
 class ParallelModelCheckpoint(ModelCheckpoint):
     def __init__(self,
                  model,
@@ -71,6 +73,7 @@ def tfdata_generator(filename, batch_size, aug=False):
     dataset = dataset.batch(batch_size)
     return dataset
 
+
 if platform.system() == 'Windows':
     base_dir = os.path.join('D:\\', 'Program', 'Bite')
 
@@ -89,11 +92,10 @@ x = keras.layers.Dropout(0.2)(x)
 # x = keras.layers.Dense(units=4096, activation='relu', name='final_dense', kernel_regularizer=L1L2(l2=0.001))(x)
 # x = keras.layers.Dropout(0.2)(x)
 outputs = keras.layers.Dense(7, activation='softmax', name='predictions', kernel_regularizer=L1L2(l2=0.001))(x)
-
-model = keras.models.Model(inputs.input, outputs)
-
-# parallel_model = multi_gpu_model(model, gpus=2)
-parallel_model = model
+with tf.device('/cpu:0'):
+    model = keras.models.Model(inputs.input, outputs)
+    parallel_model = multi_gpu_model(model, gpus=2)
+# parallel_model = model
 # learning_rate = tf.keras.optimizers.
 optimizer = tf.train.AdamOptimizer(learning_rate=0.001)
 
@@ -107,7 +109,7 @@ earlystopping = keras.callbacks.EarlyStopping('val_loss', patience=50)
 callbacks_list = [ckpt]
 parallel_model.fit(x=training_set.make_one_shot_iterator(),
                    batch_size=8,
-                   steps_per_epoch=int(27290 / 8),
+                   steps_per_epoch=int(27290 / 32),
                    validation_data=validation_set.make_one_shot_iterator(),
-                   validation_steps=int(27290 / 8),
+                   validation_steps=int(27290 / 32),
                    epochs=50000, callbacks=callbacks_list)
